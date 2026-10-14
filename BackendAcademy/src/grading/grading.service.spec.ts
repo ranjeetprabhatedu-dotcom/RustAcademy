@@ -5,6 +5,8 @@ import { DomainEventBus } from '../gamification/domain-event-bus';
 import { XpService } from '../gamification/xp.service';
 import { GRADING_PASS_THRESHOLD } from './grading.types';
 import { GradingService } from './grading.service';
+import { GradingController } from './grading.controller';
+import { TutorReviewDto } from './dto/tutor-review.dto';
 
 const PASSING_AI_RESPONSE = {
   text: '{"score": 82, "feedback": "Clear ownership handling; add error handling for the unwrap."}',
@@ -288,6 +290,120 @@ describe('GradingService', () => {
       expect(xpService.getBalance('learner-1')).toBe(0);
 
       xpService.onModuleDestroy();
+    });
+  });
+
+  // ── BA-043: Validate tutor review scores and feedback ────────────────────
+
+  describe('BA-043 — Validate tutor review scores and feedback', () => {
+    let controller: GradingController;
+    let service: GradingService;
+
+    beforeEach(async () => {
+      const created = createService();
+      service = created.service;
+      controller = new GradingController(service);
+    });
+
+    it('accepts override reviews at score boundaries (0 and 100)', async () => {
+      const id1 = await gradedSubmission(service);
+      const res1 = controller.tutorReview(id1, {
+        tutorId: 'tutor-1',
+        decision: 'override',
+        score: 0,
+        reason: 'Complete rewrite needed.',
+      });
+      expect(res1.finalScore).toBe(0);
+      expect(res1.status).toBe('tutor_overridden');
+
+      const id2 = await gradedSubmission(service);
+      const res2 = controller.tutorReview(id2, {
+        tutorId: 'tutor-1',
+        decision: 'override',
+        score: 100,
+        feedback: 'Flawless submission with edge tests.',
+      });
+      expect(res2.finalScore).toBe(100);
+      expect(res2.status).toBe('tutor_overridden');
+    });
+
+    it('rejects override reviews with score below 0 with BadRequestException', async () => {
+      const id = await gradedSubmission(service);
+      expect(() =>
+        controller.tutorReview(id, {
+          tutorId: 'tutor-1',
+          decision: 'override',
+          score: -1,
+          reason: 'Below minimum score',
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('rejects override reviews with score above 100 with BadRequestException', async () => {
+      const id = await gradedSubmission(service);
+      expect(() =>
+        controller.tutorReview(id, {
+          tutorId: 'tutor-1',
+          decision: 'override',
+          score: 101,
+          reason: 'Above maximum score',
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('rejects fractional/non-integer scores with BadRequestException', async () => {
+      const id = await gradedSubmission(service);
+      expect(() =>
+        controller.tutorReview(id, {
+          tutorId: 'tutor-1',
+          decision: 'override',
+          score: 85.5,
+          reason: 'Non-integer score',
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('rejects override when both reason and feedback are missing or empty', async () => {
+      const id1 = await gradedSubmission(service);
+      expect(() =>
+        controller.tutorReview(id1, {
+          tutorId: 'tutor-1',
+          decision: 'override',
+          score: 75,
+        }),
+      ).toThrow(BadRequestException);
+
+      const id2 = await gradedSubmission(service);
+      expect(() =>
+        controller.tutorReview(id2, {
+          tutorId: 'tutor-1',
+          decision: 'override',
+          score: 75,
+          reason: '   ',
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('accepts override with feedback field in place of reason', async () => {
+      const id = await gradedSubmission(service);
+      const res = controller.tutorReview(id, {
+        tutorId: 'tutor-1',
+        decision: 'override',
+        score: 90,
+        feedback: 'Good implementation with clean types.',
+      });
+      expect(res.finalScore).toBe(90);
+      expect(res.tutorReview?.reason).toBe('Good implementation with clean types.');
+    });
+
+    it('allows confirm review without override score or feedback', async () => {
+      const id = await gradedSubmission(service);
+      const res = controller.tutorReview(id, {
+        tutorId: 'tutor-1',
+        decision: 'confirm',
+      });
+      expect(res.status).toBe('tutor_confirmed');
+      expect(res.finalScore).toBe(82);
     });
   });
 });
