@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -57,6 +57,16 @@ import { CertificatesModule } from './certificates/certificates.module';
     // token), so the rate limiting configured above is actually
     // enforced on every request rather than just being available.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Registers global strict validation pipe: rejects unknown DTO properties
+    // without stripping or silently accepting them.
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
+    },
   ],
 })
 export class AppModule {}

@@ -6,6 +6,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+export const validationPipeOptions = {
+  whitelist: true,
+  transform: true,
+  forbidNonWhitelisted: true,
+};
+
 // Application entry point: creates the Nest app, applies global
 // middleware/pipes, optionally sets up Swagger docs, and starts
 // listening on the configured port.
@@ -25,18 +31,13 @@ async function bootstrap() {
   // liveness/readiness/status checks remain reachable at their bare
   // paths for monitoring tools that expect them un-prefixed).
   app.setGlobalPrefix('api', { exclude: ['health'] });
-
   // Global validation pipe applied to all incoming request bodies/params:
   //  - whitelist: strips properties not defined on the target DTO
   //  - transform: converts payloads into instances of their DTO classes
   //  - forbidNonWhitelisted: rejects requests containing any property
   //    not defined on the DTO (rather than silently dropping them)
   app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-    }),
+    new ValidationPipe(validationPipeOptions),
   );
 
   const configService = app.get(ConfigService);
