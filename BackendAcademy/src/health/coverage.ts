@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, TooManyRequestsException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 
 export interface ChatMessage {
   id: string;
@@ -83,7 +88,7 @@ export class ModerationService {
   private assertRateLimit(userId: string, now: number): void {
     const recent = (this.rateWindows.get(userId) ?? []).filter((timestamp) => now - timestamp < this.rateWindowMs);
     if (recent.length >= this.maxMessagesPerWindow) {
-      throw new TooManyRequestsException('Chat rate limit exceeded');
+      throw new HttpException('Chat rate limit exceeded', HttpStatus.TOO_MANY_REQUESTS);
     }
     recent.push(now);
     this.rateWindows.set(userId, recent);
