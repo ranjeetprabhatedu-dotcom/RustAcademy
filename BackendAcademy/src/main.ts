@@ -3,8 +3,15 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+
+export const DEFAULT_MAX_BODY_SIZE = '1mb';
+
+export function getRequestBodyLimit(): string {
+  return process.env.MAX_BODY_SIZE ?? DEFAULT_MAX_BODY_SIZE;
+}
 
 // Application entry point: creates the Nest app, applies global
 // middleware/pipes, optionally sets up Swagger docs, and starts
@@ -12,6 +19,11 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Bounded request body size: rejects oversized JSON/urlencoded bodies with 413 error
+  const bodyLimit = getRequestBodyLimit();
+  app.use(json({ limit: bodyLimit }));
+  app.use(urlencoded({ extended: true, limit: bodyLimit }));
 
   // Sets a range of security-related HTTP headers (CSP, X-Frame-Options,
   // etc.) on every response.

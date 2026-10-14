@@ -15,6 +15,8 @@ import { ProgressModule } from './progress/progress.module';
 import { CoursesModule } from './courses/courses.module';
 import { CertificatesModule } from './certificates/certificates.module';
 
+export const REQUEST_BODY_LIMIT = 'REQUEST_BODY_LIMIT';
+
 // Root application module: wires together global configuration/guards,
 // every feature module, and the top-level controllers/providers.
 @Module({
@@ -57,6 +59,11 @@ import { CertificatesModule } from './certificates/certificates.module';
     // token), so the rate limiting configured above is actually
     // enforced on every request rather than just being available.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Provides configured request body limit across the app
+    {
+      provide: REQUEST_BODY_LIMIT,
+      useValue: process.env.MAX_BODY_SIZE ?? '1mb',
+    },
   ],
 })
 export class AppModule {}
