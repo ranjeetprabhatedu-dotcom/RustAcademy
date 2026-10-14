@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { FollowDto } from './dto/follow.dto';
 import {
   DEFAULT_RANK_WEIGHT,
   FeedItem,
@@ -35,14 +36,19 @@ export class FollowService {
     return `${followerId}|${followeeId}`;
   }
 
-  follow(followerId: string, followeeId: string): FollowEdge {
+  follow(followerId: string, followeeId: string): FollowEdge;
+  follow(dto: FollowDto): FollowEdge;
+  follow(followerOrDto: string | FollowDto, maybeFolloweeId?: string): FollowEdge {
+    const followerId = typeof followerOrDto === 'object' ? followerOrDto.followerId : followerOrDto;
+    const followeeId = typeof followerOrDto === 'object' ? followerOrDto.followeeId : maybeFolloweeId!;
+
     if (followerId === followeeId) {
       throw new BadRequestException('An account cannot follow itself');
     }
 
     const key = FollowService.edgeKey(followerId, followeeId);
     const existing = this.edges.get(key);
-    // Idempotent: re-following must not duplicate the edge or reset followedAt.
+    // Idempotent: re-following must not duplicate the edge, reset followedAt, or create duplicate relationships.
     if (existing) return existing;
 
     const edge: FollowEdge = {
@@ -59,8 +65,13 @@ export class FollowService {
   /**
    * Removes the edge. Deliberately does not touch `feeds`: items already fanned
    * out stay in the follower's history (BE-088).
+   * Operation is idempotent: repeated unfollow requests safely return false without side-effects.
    */
-  unfollow(followerId: string, followeeId: string): boolean {
+  unfollow(followerId: string, followeeId: string): boolean;
+  unfollow(dto: FollowDto): boolean;
+  unfollow(followerOrDto: string | FollowDto, maybeFolloweeId?: string): boolean {
+    const followerId = typeof followerOrDto === 'object' ? followerOrDto.followerId : followerOrDto;
+    const followeeId = typeof followerOrDto === 'object' ? followerOrDto.followeeId : maybeFolloweeId!;
     const key = FollowService.edgeKey(followerId, followeeId);
     if (!this.edges.delete(key)) return false;
 

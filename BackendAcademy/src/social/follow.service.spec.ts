@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { FollowDto } from './dto/follow.dto';
 import { FollowService } from './follow.service';
 import { DEFAULT_RANK_WEIGHT, FOLLOW_RANK_WEIGHT } from './social.types';
 
@@ -150,6 +151,43 @@ describe('FollowService', () => {
 
     it('returns an empty feed for an unknown viewer', () => {
       expect(service.getFeed('nobody')).toEqual([]);
+    });
+  });
+
+  // ── BA-052: Make follow operations idempotent ───────────────────────────
+
+  describe('BA-052 — Idempotent follow operations', () => {
+    it('does not create duplicate relationships on repeated follow requests', () => {
+      const e1 = service.follow('user-a', 'user-b');
+      const e2 = service.follow('user-a', 'user-b');
+      const e3 = service.follow('user-a', 'user-b');
+
+      expect(e2).toEqual(e1);
+      expect(e3).toEqual(e1);
+
+      // Follower / following collections must have exactly 1 edge
+      expect(service.getFollowing('user-a')).toEqual(['user-b']);
+      expect(service.getFollowers('user-b')).toEqual(['user-a']);
+      expect(service.getCounts('user-b')).toEqual({ followers: 1, following: 0 });
+      expect(service.getCounts('user-a')).toEqual({ followers: 0, following: 1 });
+    });
+
+    it('supports DTO invocation idempotently without duplicating edges', () => {
+      const dto: FollowDto = { followerId: 'learner-10', followeeId: 'tutor-20' };
+      const e1 = service.follow(dto);
+      const e2 = service.follow(dto);
+
+      expect(e1).toEqual(e2);
+      expect(service.isFollowing('learner-10', 'tutor-20')).toBe(true);
+      expect(service.getFollowing('learner-10')).toHaveLength(1);
+    });
+
+    it('unfollow is also idempotent when called repeatedly', () => {
+      service.follow('user-x', 'user-y');
+      expect(service.unfollow('user-x', 'user-y')).toBe(true);
+      expect(service.unfollow('user-x', 'user-y')).toBe(false);
+      expect(service.unfollow({ followerId: 'user-x', followeeId: 'user-y' })).toBe(false);
+      expect(service.isFollowing('user-x', 'user-y')).toBe(false);
     });
   });
 });
