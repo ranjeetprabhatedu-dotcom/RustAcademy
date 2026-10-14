@@ -3,8 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
+    "dev": "node init && turbo run dev",
+    "build": "node init && turbo run build",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test"
@@ -34,7 +34,7 @@
     "uuid": "^14.0.1"
   },
   "version": "1.0.0",
-  "description": "> **A decentralized, AI-powered Rust programming academy on the Stellar blockchain — where learners earn XLM for completing tasks, tutors get rewarded for teaching, and a thriving developer community grows together.**",
+  "description": "> **A decentralized, AI-powered Rust programming academy on the Stellar blockchain \u2014 where learners earn XLM for completing tasks, tutors get rewarded for teaching, and a thriving developer community grows together.**",
   "main": "send_test_payment.js",
   "directories": {
     "doc": "docs"
