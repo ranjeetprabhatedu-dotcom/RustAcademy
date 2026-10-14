@@ -13,6 +13,9 @@ const ALLOWED_TRANSITIONS: Record<ChallengeState, ChallengeState[]> = {
   closed: [],
 };
 
+/** Default submission attempt retry limit per user per challenge (BA-057). */
+export const DEFAULT_MAX_CHALLENGE_ATTEMPTS = 3;
+
 @Injectable()
 export class ChallengeService {
   private readonly challenges = new Map<string, Challenge>();
@@ -21,14 +24,29 @@ export class ChallengeService {
   private readonly votes = new Map<string, Map<string, string>>();
   /** Payout requests awaiting the BE-053 job. */
   private readonly payoutQueue: ChallengePayout[] = [];
+  /** challengeId → (userId → attemptCount) */
+  private readonly attempts = new Map<string, Map<string, number>>();
+  /** challengeId → configured max attempts */
+  private readonly maxAttemptsConfig = new Map<string, number>();
 
-  create(input: { challengeId: string; title: string; potStroops: bigint }): Challenge {
+  create(input: {
+    challengeId: string;
+    title: string;
+    potStroops: bigint;
+    maxAttempts?: number;
+  }): Challenge {
     if (this.challenges.has(input.challengeId)) {
       throw new BadRequestException(`Challenge ${input.challengeId} already exists`);
     }
     if (input.potStroops < 0n) {
       throw new BadRequestException('potStroops cannot be negative');
     }
+    if (input.maxAttempts !== undefined && input.maxAttempts < 1) {
+      throw new BadRequestException('maxAttempts must be at least 1');
+    }
+
+    const maxAttempts = input.maxAttempts ?? DEFAULT_MAX_CHALLENGE_ATTEMPTS;
+    this.maxAttemptsConfig.set(input.challengeId, maxAttempts);
 
     const challenge: Challenge = {
       challengeId: input.challengeId,
@@ -47,14 +65,35 @@ export class ChallengeService {
     return challenge;
   }
 
-  /** Entries arrive from the task pipeline; accepted only while `open`. */
+  getMaxAttempts(challengeId: string): number {
+    return this.maxAttemptsConfig.get(challengeId) ?? DEFAULT_MAX_CHALLENGE_ATTEMPTS;
+  }
+
+  getAttempts(challengeId: string, userId: string): number {
+    return this.attempts.get(challengeId)?.get(userId) ?? 0;
+  }
+
+  /** Entries arrive from the task pipeline; accepted only while `open` and within retry limit. */
   submit(challengeId: string, input: { userId: string; submissionId: string }): ChallengeSubmission {
     this.assertState(challengeId, 'open', 'accept submissions');
+
+    const maxLimit = this.maxAttemptsConfig.get(challengeId) ?? DEFAULT_MAX_CHALLENGE_ATTEMPTS;
+    const challengeAttempts = this.attempts.get(challengeId) ?? new Map<string, number>();
+    const currentAttempts = challengeAttempts.get(input.userId) ?? 0;
+
+    if (currentAttempts >= maxLimit) {
+      throw new BadRequestException(
+        `User ${input.userId} exceeded maximum allowed submission attempts (${maxLimit}) for challenge ${challengeId}`,
+      );
+    }
 
     const existing = this.submissions.get(challengeId) ?? [];
     if (existing.some((s) => s.submissionId === input.submissionId)) {
       throw new BadRequestException(`Submission ${input.submissionId} already entered`);
     }
+
+    challengeAttempts.set(input.userId, currentAttempts + 1);
+    this.attempts.set(challengeId, challengeAttempts);
 
     const submission: ChallengeSubmission = {
       ...input,

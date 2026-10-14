@@ -199,4 +199,87 @@ describe('ChallengeService', () => {
       expect(pending[0].challengeId).toBe('wk-1');
     });
   });
+
+  // ── BA-057: Bound challenge submission attempts ──────────────────────────
+
+  describe('BA-057 — Bound challenge submission attempts', () => {
+    it('enforces default retry limit: tests before, at, and beyond the limit', () => {
+      // Default limit is 3 attempts
+      expect(service.getMaxAttempts('wk-1')).toBe(3);
+
+      // 1. Before the limit (attempts 1 and 2)
+      const sub1 = service.submit('wk-1', { userId: 'alice', submissionId: 'sub-1' });
+      expect(sub1.submissionId).toBe('sub-1');
+      expect(service.getAttempts('wk-1', 'alice')).toBe(1);
+
+      const sub2 = service.submit('wk-1', { userId: 'alice', submissionId: 'sub-2' });
+      expect(sub2.submissionId).toBe('sub-2');
+      expect(service.getAttempts('wk-1', 'alice')).toBe(2);
+
+      // 2. Exactly at the limit (attempt 3)
+      const sub3 = service.submit('wk-1', { userId: 'alice', submissionId: 'sub-3' });
+      expect(sub3.submissionId).toBe('sub-3');
+      expect(service.getAttempts('wk-1', 'alice')).toBe(3);
+
+      // 3. Beyond the limit (attempt 4)
+      expect(() =>
+        service.submit('wk-1', { userId: 'alice', submissionId: 'sub-4' }),
+      ).toThrow(BadRequestException);
+
+      // Verify attempts counter remains at 3
+      expect(service.getAttempts('wk-1', 'alice')).toBe(3);
+    });
+
+    it('enforces custom configured retry limit: tests before, at, and beyond limit', () => {
+      // Create a challenge with maxAttempts = 2
+      service.create({
+        challengeId: 'custom-bound',
+        title: 'Strict Retry Challenge',
+        potStroops: POT,
+        maxAttempts: 2,
+      });
+
+      expect(service.getMaxAttempts('custom-bound')).toBe(2);
+
+      // Before limit (attempt 1)
+      service.submit('custom-bound', { userId: 'coder', submissionId: 'c-sub-1' });
+      expect(service.getAttempts('custom-bound', 'coder')).toBe(1);
+
+      // At limit (attempt 2)
+      service.submit('custom-bound', { userId: 'coder', submissionId: 'c-sub-2' });
+      expect(service.getAttempts('custom-bound', 'coder')).toBe(2);
+
+      // Beyond limit (attempt 3) -> rejected
+      expect(() =>
+        service.submit('custom-bound', { userId: 'coder', submissionId: 'c-sub-3' }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('does not impact other users attempts', () => {
+      service.submit('wk-1', { userId: 'u1', submissionId: 'u1-1' });
+      service.submit('wk-1', { userId: 'u1', submissionId: 'u1-2' });
+      service.submit('wk-1', { userId: 'u1', submissionId: 'u1-3' });
+
+      // u1 is exhausted
+      expect(() => service.submit('wk-1', { userId: 'u1', submissionId: 'u1-4' })).toThrow(
+        BadRequestException,
+      );
+
+      // u2 can still submit
+      expect(service.submit('wk-1', { userId: 'u2', submissionId: 'u2-1' }).submissionId).toBe(
+        'u2-1',
+      );
+    });
+
+    it('rejects creation with maxAttempts less than 1', () => {
+      expect(() =>
+        service.create({
+          challengeId: 'bad-limit',
+          title: 'Zero Limit',
+          potStroops: POT,
+          maxAttempts: 0,
+        }),
+      ).toThrow(BadRequestException);
+    });
+  });
 });

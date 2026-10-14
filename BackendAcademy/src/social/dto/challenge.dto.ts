@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class CreateChallengeDto {
   @IsString()
@@ -14,6 +14,12 @@ export class CreateChallengeDto {
   @IsInt()
   @Min(0)
   potStroops: number;
+
+  /** Maximum allowed submission attempts per user (defaults to 3). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxAttempts?: number;
 }
 
 export class SubmitChallengeDto {
