@@ -6,7 +6,9 @@ import {
   HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -80,6 +82,26 @@ export class SocialController {
   @Get('users/:userId/showcases')
   listShowcases(@Param('userId') userId: string) {
     return { userId, showcases: this.showcaseService.listByAuthor(userId) };
+  }
+
+  @Put('showcases/:itemId')
+  updateShowcase(
+    @Param('itemId') itemId: string,
+    @Body() dto: { editorId?: string; authorId?: string; title?: string; repoUrl?: string; demoUrl?: string; contractId?: string },
+    @Req() request: Request,
+  ) {
+    const editorId = dto.editorId ?? dto.authorId ?? (request.headers['x-user-id'] as string);
+    return this.showcaseService.update(itemId, editorId, dto);
+  }
+
+  @Patch('showcases/:itemId')
+  patchShowcase(
+    @Param('itemId') itemId: string,
+    @Body() dto: { editorId?: string; authorId?: string; title?: string; repoUrl?: string; demoUrl?: string; contractId?: string },
+    @Req() request: Request,
+  ) {
+    const editorId = dto.editorId ?? dto.authorId ?? (request.headers['x-user-id'] as string);
+    return this.showcaseService.update(itemId, editorId, dto);
   }
 
   // ── Hashtags and trending (BE-090) ──────────────────────────────────────

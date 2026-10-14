@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { StrKey } from '@stellar/stellar-sdk';
 import { FollowService } from './follow.service';
 import { ShowcasePost } from './social.types';
@@ -65,6 +65,53 @@ export class ShowcaseService {
 
   listByAuthor(authorId: string): ShowcasePost[] {
     return [...this.posts.values()].filter((post) => post.authorId === authorId);
+  }
+
+  /**
+   * Updates a showcase post.
+   *
+   * Enforces project ownership: only the author who created the showcase is
+   * allowed to update its title or external URLs / contract id (BA-056).
+   */
+  update(
+    itemId: string,
+    editorId: string,
+    patch: Partial<{
+      title: string;
+      repoUrl: string;
+      demoUrl: string;
+      contractId: string;
+    }>,
+  ): ShowcasePost {
+    const post = this.posts.get(itemId);
+    if (!post) {
+      throw new NotFoundException(`Showcase post "${itemId}" not found`);
+    }
+
+    if (!editorId || post.authorId !== editorId) {
+      throw new ForbiddenException(
+        `Only the project owner ("${post.authorId}") can edit showcase "${itemId}"`,
+      );
+    }
+
+    if (patch.repoUrl !== undefined) {
+      this.assertHttpsUrl(patch.repoUrl, 'repoUrl');
+      post.repoUrl = patch.repoUrl;
+    }
+    if (patch.demoUrl !== undefined) {
+      this.assertHttpsUrl(patch.demoUrl, 'demoUrl');
+      post.demoUrl = patch.demoUrl;
+    }
+    if (patch.contractId !== undefined) {
+      this.assertContractId(patch.contractId);
+      post.contractId = patch.contractId;
+    }
+    if (patch.title !== undefined) {
+      post.title = patch.title;
+    }
+
+    this.posts.set(itemId, post);
+    return post;
   }
 
   /**

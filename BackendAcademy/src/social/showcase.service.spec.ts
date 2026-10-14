@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Keypair, StrKey } from '@stellar/stellar-sdk';
 import { FollowService } from './follow.service';
 import { ShowcaseService } from './showcase.service';
@@ -117,6 +117,65 @@ describe('ShowcaseService', () => {
 
     it('names the offending field in the error', () => {
       expect(() => service.create({ ...valid, demoUrl: 'nope' })).toThrow(/demoUrl/);
+    });
+  });
+
+  // ── BA-056: Enforce showcase ownership on updates ────────────────────────
+
+  describe('BA-056 — Enforce showcase ownership on updates', () => {
+    it('allows the authenticated project owner to update their showcase', () => {
+      const post = service.create(valid);
+
+      const updated = service.update(post.itemId, 'tutor-1', {
+        title: 'Updated Escrow Demo',
+        demoUrl: 'https://new-demo.example.dev',
+      });
+
+      expect(updated.title).toBe('Updated Escrow Demo');
+      expect(updated.demoUrl).toBe('https://new-demo.example.dev');
+      expect(updated.repoUrl).toBe(valid.repoUrl);
+      expect(service.get(post.itemId)?.title).toBe('Updated Escrow Demo');
+    });
+
+    it('rejects edits by non-owners with ForbiddenException', () => {
+      const post = service.create(valid);
+
+      expect(() =>
+        service.update(post.itemId, 'imposter-user', {
+          title: 'Hacked showcase',
+        }),
+      ).toThrow(ForbiddenException);
+
+      // Verify stored showcase is uncorrupted
+      expect(service.get(post.itemId)?.title).toBe(valid.title);
+    });
+
+    it('rejects updates when editorId is missing or empty', () => {
+      const post = service.create(valid);
+
+      expect(() =>
+        service.update(post.itemId, '', {
+          title: 'Anonymous edit',
+        }),
+      ).toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException for non-existent showcase item', () => {
+      expect(() =>
+        service.update('showcase-nonexistent', 'tutor-1', {
+          title: 'New Title',
+        }),
+      ).toThrow(NotFoundException);
+    });
+
+    it('validates updated URLs and rejects plaintext http', () => {
+      const post = service.create(valid);
+
+      expect(() =>
+        service.update(post.itemId, 'tutor-1', {
+          demoUrl: 'http://insecure.example.dev',
+        }),
+      ).toThrow(BadRequestException);
     });
   });
 });
