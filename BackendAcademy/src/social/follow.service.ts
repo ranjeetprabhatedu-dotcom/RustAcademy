@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { FollowDto, SelfFollowError } from './dto/follow.dto';
 import {
   DEFAULT_RANK_WEIGHT,
   FeedItem,
@@ -35,9 +36,22 @@ export class FollowService {
     return `${followerId}|${followeeId}`;
   }
 
-  follow(followerId: string, followeeId: string): FollowEdge {
-    if (followerId === followeeId) {
-      throw new BadRequestException('An account cannot follow itself');
+  follow(followerId: string, followeeId: string): FollowEdge;
+  follow(dto: FollowDto): FollowEdge;
+  follow(followerOrDto: string | FollowDto, maybeFolloweeId?: string): FollowEdge {
+    const followerId = typeof followerOrDto === 'object' ? followerOrDto.followerId : followerOrDto;
+    const followeeId = typeof followerOrDto === 'object' ? followerOrDto.followeeId : maybeFolloweeId!;
+
+    if (!followerId || !followeeId) {
+      throw new BadRequestException('Follower and followee IDs must be provided');
+    }
+
+    if (followerId === followeeId || followerId.trim() === followeeId.trim()) {
+      const errorPayload: SelfFollowError = {
+        code: 'CANNOT_FOLLOW_SELF',
+        message: 'An account cannot follow itself',
+      };
+      throw new BadRequestException(errorPayload);
     }
 
     const key = FollowService.edgeKey(followerId, followeeId);

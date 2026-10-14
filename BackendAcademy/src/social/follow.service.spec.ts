@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { FollowDto } from './dto/follow.dto';
 import { FollowService } from './follow.service';
 import { DEFAULT_RANK_WEIGHT, FOLLOW_RANK_WEIGHT } from './social.types';
 
@@ -150,6 +151,34 @@ describe('FollowService', () => {
 
     it('returns an empty feed for an unknown viewer', () => {
       expect(service.getFeed('nobody')).toEqual([]);
+    });
+  });
+
+  // ── BA-053: Prevent users from following themselves ──────────────────────
+
+  describe('BA-053 — Prevent users from following themselves', () => {
+    it('rejects self-follow with structured CANNOT_FOLLOW_SELF error code', () => {
+      let caught: BadRequestException | undefined;
+      try {
+        service.follow('learner-self', 'learner-self');
+      } catch (err) {
+        caught = err as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect(caught!.getStatus()).toBe(400);
+      const res = caught!.getResponse() as Record<string, unknown>;
+      expect(res.code).toBe('CANNOT_FOLLOW_SELF');
+      expect(res.message).toBe('An account cannot follow itself');
+    });
+
+    it('rejects self-follow passed via DTO object', () => {
+      const dto: FollowDto = { followerId: 'user-99', followeeId: 'user-99' };
+      expect(() => service.follow(dto)).toThrow(BadRequestException);
+    });
+
+    it('rejects self-follow with trailing or leading whitespace', () => {
+      expect(() => service.follow('user-trim ', ' user-trim')).toThrow(BadRequestException);
     });
   });
 });
