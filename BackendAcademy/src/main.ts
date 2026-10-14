@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { malformedJsonHandler } from './app.controller';
 
 // Application entry point: creates the Nest app, applies global
 // middleware/pipes, optionally sets up Swagger docs, and starts
@@ -12,6 +13,9 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Safely handles malformed JSON client errors with 400 response
+  app.use(malformedJsonHandler);
 
   // Sets a range of security-related HTTP headers (CSP, X-Frame-Options,
   // etc.) on every response.
