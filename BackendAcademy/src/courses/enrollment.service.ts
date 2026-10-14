@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { CourseService } from './course.service';
 import { LessonService } from './lesson.service';
-import { Enrollment, LessonProgress, PrerequisiteError } from './course.types';
+import { CourseNotPublishedError, Enrollment, LessonProgress, PrerequisiteError } from './course.types';
 
 /**
  * Enrollment and lesson-progress service (BE-041).
@@ -63,6 +63,14 @@ export class EnrollmentService {
    */
   enroll(userId: string, courseId: string): Enrollment {
     const course = this.courseService.findById(courseId);
+
+    if (course.status === 'draft') {
+      const errorPayload: CourseNotPublishedError = {
+        code: 'COURSE_NOT_PUBLISHED',
+        message: `Cannot enroll in draft course "${courseId}". Course is not published.`,
+      };
+      throw new ConflictException(errorPayload);
+    }
 
     const userEnrollments = this.enrollments.get(userId) ?? new Map<string, Enrollment>();
 

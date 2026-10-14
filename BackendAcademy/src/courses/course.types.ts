@@ -17,7 +17,7 @@
  *   before starting Lesson 2").
  */
 
-// ── Course ──────────────────────────────────────────────────────────────────
+export type CourseStatus = 'draft' | 'published';
 
 export interface Course {
   courseId: string;
@@ -28,6 +28,8 @@ export interface Course {
    * can enrol in this course (e.g. ["ownership-101"] before "lifetimes-201").
    */
   prerequisiteCourseIds: string[];
+  /** Publication status: 'draft' | 'published'. Draft courses reject enrollment. */
+  status?: CourseStatus | string;
   createdAt: string;
 }
 
@@ -76,4 +78,9 @@ export interface PrerequisiteError {
   message: string;
   /** The specific prerequisite IDs that are not yet satisfied. */
   unmetPrerequisiteIds: string[];
+}
+
+export interface CourseNotPublishedError {
+  code: 'COURSE_NOT_PUBLISHED';
+  message: string;
 }

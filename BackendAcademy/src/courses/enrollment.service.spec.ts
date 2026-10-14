@@ -360,4 +360,42 @@ describe('EnrollmentService — prerequisite chains (BE-041)', () => {
       expect(enrollment.courseId).toBe('lifetimes-201');
     });
   });
+
+  // ── Course publication status (BA-013) ───────────────────────────────────
+
+  describe('course publication status (BA-013)', () => {
+    it('rejects enrollment in a draft course with 409 ConflictException', () => {
+      const course = makeCourse('rust-advanced-draft');
+      course.status = 'draft';
+
+      let caught: ConflictException | undefined;
+      try {
+        enrollmentService.enroll('user-1', 'rust-advanced-draft');
+      } catch (err) {
+        caught = err as ConflictException;
+      }
+
+      expect(caught).toBeInstanceOf(ConflictException);
+      expect(caught!.getStatus()).toBe(409);
+      const body = caught!.getResponse() as Record<string, unknown>;
+      expect(body.code).toBe('COURSE_NOT_PUBLISHED');
+      expect(typeof body.message).toBe('string');
+      expect(body.message).toContain('rust-advanced-draft');
+    });
+
+    it('allows enrollment in a published course', () => {
+      const course = makeCourse('rust-intro-published');
+      course.status = 'published';
+
+      const enrollment = enrollmentService.enroll('user-1', 'rust-intro-published');
+      expect(enrollment.courseId).toBe('rust-intro-published');
+      expect(enrollment.userId).toBe('user-1');
+    });
+
+    it('allows enrollment in a course when status is not explicitly set (defaults to allowed)', () => {
+      makeCourse('rust-standard-course');
+      const enrollment = enrollmentService.enroll('user-1', 'rust-standard-course');
+      expect(enrollment.courseId).toBe('rust-standard-course');
+    });
+  });
 });
