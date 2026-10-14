@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { validationExceptionFactory } from './app.controller';
 
 // Application entry point: creates the Nest app, applies global
 // middleware/pipes, optionally sets up Swagger docs, and starts
@@ -31,11 +32,13 @@ async function bootstrap() {
   //  - transform: converts payloads into instances of their DTO classes
   //  - forbidNonWhitelisted: rejects requests containing any property
   //    not defined on the DTO (rather than silently dropping them)
+  //  - exceptionFactory: standardizes validation error response format (BA-114)
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: validationExceptionFactory,
     }),
   );
 
