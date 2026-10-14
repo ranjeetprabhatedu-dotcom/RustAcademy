@@ -48,19 +48,15 @@ test_snapshots/
 *.sublime-workspace
 
 # IDE - VSCode
-.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
 # dotenv environment variable files
-.env
 .env.development.local
 .env.test.local
 .env.production.local
-.env.local
-.env.development
 
 # temp directory
 .temp
@@ -96,3 +92,4 @@ commit_*.ps1
 commit_*.sh
 
 main
+config.bat
