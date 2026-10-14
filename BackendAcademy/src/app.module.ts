@@ -1,6 +1,12 @@
-import { Module } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  Module,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,6 +20,41 @@ import { SandboxModule } from './sandbox/sandbox.module';
 import { ProgressModule } from './progress/progress.module';
 import { CoursesModule } from './courses/courses.module';
 import { CertificatesModule } from './certificates/certificates.module';
+
+export interface NotFoundErrorPayload {
+  statusCode: 404;
+  error: 'Not Found';
+  message: string;
+  path?: string;
+  timestamp: string;
+}
+
+@Catch(NotFoundException)
+export class NotFoundExceptionFilter implements ExceptionFilter {
+  catch(exception: NotFoundException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
+    const request = ctx.getRequest();
+
+    const payload: NotFoundErrorPayload = {
+      statusCode: 404,
+      error: 'Not Found',
+      message: `Resource at route '${request?.url || 'unknown'}' was not found`,
+      path: request?.url,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (typeof response?.status === 'function') {
+      const chain = response.status(404);
+      if (chain && typeof chain.json === 'function') {
+        return chain.json(payload);
+      }
+    }
+    if (typeof response?.json === 'function') {
+      return response.json(payload);
+    }
+  }
+}
 
 // Root application module: wires together global configuration/guards,
 // every feature module, and the top-level controllers/providers.
@@ -57,6 +98,8 @@ import { CertificatesModule } from './certificates/certificates.module';
     // token), so the rate limiting configured above is actually
     // enforced on every request rather than just being available.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Standardizes not-found responses for unmatched routes (BA-119)
+    { provide: APP_FILTER, useClass: NotFoundExceptionFilter },
   ],
 })
 export class AppModule {}

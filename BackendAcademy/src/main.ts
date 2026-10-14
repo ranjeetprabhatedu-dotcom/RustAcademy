@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { AppModule } from './app.module';
+import { AppModule, NotFoundExceptionFilter } from './app.module';
 
 // Application entry point: creates the Nest app, applies global
 // middleware/pipes, optionally sets up Swagger docs, and starts
@@ -12,6 +12,9 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Maps unmatched routes to standardized not-found response (BA-119)
+  app.useGlobalFilters(new NotFoundExceptionFilter());
 
   // Sets a range of security-related HTTP headers (CSP, X-Frame-Options,
   // etc.) on every response.
